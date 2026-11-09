@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useState } from "react";
 
 import {
   canConfirm,
@@ -51,7 +51,10 @@ export function BallotBoxConsole({
 }) {
   const [index, setIndex] = useState(positionsCompleted);
   const [entry, setEntry] = useState<Entry>(EMPTY_ENTRY);
-  const [lookup, setLookup] = useState<Lookup | null>(null);
+  /** Resposta da busca, marcada com o cargo e o número a que se refere. */
+  const [fetched, setFetched] = useState<{ key: string; lookup: Lookup } | null>(
+    null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [failed, setFailed] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -84,39 +87,43 @@ export function BallotBoxConsole({
     return () => window.removeEventListener("beforeunload", guard);
   }, []);
 
-  // Busca o candidato assim que o número fica completo.
+  // Busca o candidato assim que o número fica completo. Só existe busca para
+  // número completo; com campo vazio, incompleto ou BRANCO, a chave é nula.
+  const lookupKey =
+    position && !entry.blank && entry.buffer.length === position.digits
+      ? `${position.id}:${entry.buffer}`
+      : null;
+
+  // Uma resposta que chegou para outra chave (o eleitor já corrigiu) não vale.
+  const lookup = fetched && fetched.key === lookupKey ? fetched.lookup : null;
+
   useEffect(() => {
-    if (!position || entry.blank) {
-      setLookup(null);
-      return;
-    }
+    if (!lookupKey) return;
 
-    if (entry.buffer.length !== position.digits) {
-      setLookup(null);
-      return;
-    }
-
+    const [positionId, number] = lookupKey.split(":");
     let cancelled = false;
 
     void (async () => {
       try {
         const response = await fetch(
-          `/api/ballot-box/candidate?position_id=${position.id}&number=${entry.buffer}`,
+          `/api/ballot-box/candidate?position_id=${positionId}&number=${number}`,
           { headers: authHeaders(), cache: "no-store" },
         );
         const body = (await response.json()) as Lookup;
-        if (!cancelled && response.ok) setLookup(body);
+        if (!cancelled && response.ok) setFetched({ key: lookupKey, lookup: body });
       } catch {
         // Sem rede, a urna trata como número não encontrado: o eleitor ainda
         // pode CORRIGIR, e a classificação real acontece no servidor.
-        if (!cancelled) setLookup({ found: false, candidate: null });
+        if (!cancelled) {
+          setFetched({ key: lookupKey, lookup: { found: false, candidate: null } });
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [position, entry, authHeaders]);
+  }, [lookupKey, authHeaders]);
 
   const confirm = useCallback(async () => {
     if (!position || busy || !canConfirm(entry, position.digits)) return;
@@ -146,7 +153,6 @@ export function BallotBoxConsole({
         if (response.ok) {
           setSubmitting(false);
           setEntry(EMPTY_ENTRY);
-          setLookup(null);
 
           if (body.finished) {
             setFinished(true);
@@ -176,8 +182,9 @@ export function BallotBoxConsole({
   }, [position, entry, busy, authHeaders, onFinished, onReload, playEnd]);
 
   // Teclado físico: a urna aceita teclado numérico além dos botões na tela.
-  const confirmRef = useRef(confirm);
-  confirmRef.current = confirm;
+  // Effect Event: o ouvinte de teclado chama sempre o `confirm` mais recente sem
+  // precisar ser registrado de novo a cada dígito.
+  const confirmFromKeyboard = useEffectEvent(() => void confirm());
 
   useEffect(() => {
     if (!position) return;
@@ -198,7 +205,7 @@ export function BallotBoxConsole({
         setEntry((current) => pressBlank(current));
       } else if (event.key === "Enter") {
         playKey();
-        void confirmRef.current();
+        confirmFromKeyboard();
       }
     };
 

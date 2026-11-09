@@ -105,8 +105,8 @@ export function PhotoUpload({
           className="group relative block h-full w-full overflow-hidden rounded-full border border-black/10 bg-black/5 transition hover:ring-2 hover:ring-blue-500/60 disabled:opacity-50 dark:border-white/15 dark:bg-white/10"
         >
           {shown ? (
-            // eslint-disable-next-line @next/next/no-img-element -- URL assinada com
-            // expiração; o otimizador do next/image não acrescenta nada aqui.
+            // URL assinada com expiração: o otimizador do next/image não acrescenta nada aqui.
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={shown}
               alt={`Foto de ${name}`}

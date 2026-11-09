@@ -47,6 +47,10 @@ export default async function TerminalsPage({ params, searchParams }: Props) {
 
   const sectionList = sections ?? [];
   const terminalList = terminals ?? [];
+  // Server Component: renderiza uma vez por requisição e não re-renderiza no
+  // navegador, então ler o relógio aqui é estável. A regra de pureza mira
+  // componentes que re-renderizam.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
   return (

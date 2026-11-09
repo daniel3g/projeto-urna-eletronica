@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 
 import { createCandidate, type FormState } from "./actions";
 
@@ -22,21 +22,26 @@ export function CandidateForm({
   electionId: string;
   positions: PositionOption[];
 }) {
-  const [state, formAction, pending] = useActionState(
-    createCandidate,
-    initialState,
-  );
-  const [positionId, setPositionId] = useState(positions[0]?.id ?? "");
   const formRef = useRef<HTMLFormElement>(null);
 
-  const selected = positions.find((p) => p.id === positionId);
+  // Limpa o formulário depois de um cadastro bem-sucedido, no próprio retorno da
+  // ação — antes era um efeito observando `pending`.
+  const [state, formAction, pending] = useActionState(
+    async (previous: FormState, formData: FormData) => {
+      const result = await createCandidate(previous, formData);
+      if (!result.error) formRef.current?.reset();
+      return result;
+    },
+    initialState,
+  );
 
-  useEffect(() => {
-    if (!pending && !state.error) {
-      formRef.current?.reset();
-      setPositionId((current) => current || positions[0]?.id || "");
-    }
-  }, [pending, state, positions]);
+  const [chosenId, setChosenId] = useState(positions[0]?.id ?? "");
+
+  // O cargo escolhido pode ter sumido da lista (removido) ou a lista pode ter
+  // chegado vazia e se preenchido depois: nesses casos vale o primeiro cargo.
+  const selected =
+    positions.find((p) => p.id === chosenId) ?? positions[0] ?? null;
+  const positionId = selected?.id ?? "";
 
   if (positions.length === 0) return null;
 
@@ -54,7 +59,7 @@ export function CandidateForm({
           <select
             name="positionId"
             value={positionId}
-            onChange={(event) => setPositionId(event.target.value)}
+            onChange={(event) => setChosenId(event.target.value)}
             className={field}
           >
             {positions.map((position) => (
