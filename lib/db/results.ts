@@ -119,6 +119,44 @@ export async function loadResults(electionId: string): Promise<Results> {
   };
 }
 
+export type RosterCandidate = {
+  id: string;
+  positionId: string;
+  number: string;
+  fullName: string;
+  ballotName: string | null;
+  partyName: string | null;
+  partyAcronym: string | null;
+  deputyName: string | null;
+};
+
+/** Candidatos ativos com todos os dados de cadastro — o anexo do relatório. */
+export async function loadCandidateRoster(
+  electionId: string,
+): Promise<RosterCandidate[]> {
+  const db = createServiceClient();
+
+  const { data } = await db
+    .from("candidates")
+    .select(
+      "id, position_id, number, full_name, ballot_name, party_name, party_acronym, deputy_name",
+    )
+    .eq("election_id", electionId)
+    .eq("is_active", true)
+    .order("number");
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    positionId: row.position_id,
+    number: row.number,
+    fullName: row.full_name,
+    ballotName: row.ballot_name,
+    partyName: row.party_name,
+    partyAcronym: row.party_acronym,
+    deputyName: row.deputy_name,
+  }));
+}
+
 export type SectionProgress = {
   id: string;
   code: string;

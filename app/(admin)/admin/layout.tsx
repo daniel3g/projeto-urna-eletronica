@@ -8,7 +8,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-black/10 px-6 py-3 dark:border-white/15">
+      <header className="flex items-center justify-between border-b border-black/10 px-6 py-3 print:hidden dark:border-white/15">
         <div className="flex items-center gap-6">
           <Link href="/admin" className="font-semibold">
             Urna Eletrônica Escolar
@@ -36,7 +36,9 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 p-6">{children}</main>
+      <main className="mx-auto w-full max-w-4xl flex-1 p-6 print:max-w-none print:p-0">
+        {children}
+      </main>
     </div>
   );
 }

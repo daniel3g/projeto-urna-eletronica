@@ -70,7 +70,15 @@ export default async function ResultsPage({ params }: Props) {
             Encerrada em {formatDateTime(election.closed_at)}
           </p>
         </div>
-        <Projection positions={results.positions} electionName={election.name} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/admin/elections/${id}/report`}
+            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+          >
+            Relatório (PDF)
+          </Link>
+          <Projection positions={results.positions} electionName={election.name} />
+        </div>
       </div>
 
       <section className="rounded-lg border border-black/10 p-4 dark:border-white/15">

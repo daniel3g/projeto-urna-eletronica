@@ -25,6 +25,23 @@ body {
 }
 
 /*
+ * Impressão (e "Salvar como PDF"): papel é sempre branco, mesmo com o sistema
+ * em modo escuro, e as margens ficam por conta do @page.
+ */
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+    color-scheme: light;
+  }
+}
+
+/*
  * O Tailwind 4 deixou de aplicar `cursor: pointer` em botões — o reset dele
  * segue o padrão do navegador, que é `default`. Sem isto, nenhum botão do
  * painel parece clicável.

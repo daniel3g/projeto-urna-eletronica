@@ -255,12 +255,18 @@ export default async function ElectionPage({ params, searchParams }: Props) {
               disponíveis.
             </p>
           </div>
-          <div>
+          <div className="flex flex-wrap gap-2">
             <Link
               href={`/admin/elections/${id}/results`}
               className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               Ver apuração
+            </Link>
+            <Link
+              href={`/admin/elections/${id}/report`}
+              className="inline-block rounded-md border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+            >
+              Relatório (PDF)
             </Link>
           </div>
         </section>
