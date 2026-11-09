@@ -40,7 +40,11 @@ export default function MesarioPage() {
       </header>
 
       {electionOpen ? (
-        <PollWorkerConsole token={token} onChanged={refresh} />
+        <PollWorkerConsole
+          token={token}
+          desk={state?.desk ?? null}
+          onChanged={refresh}
+        />
       ) : (
         <div className="flex flex-1 items-center justify-center p-6">
           <div className="max-w-md text-center">

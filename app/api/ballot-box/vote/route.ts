@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { resolveTerminal } from "@/lib/auth/terminal";
+import { notifyPollWorkers } from "@/lib/realtime/broadcast";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const MESSAGES: Record<string, string> = {
@@ -101,11 +102,19 @@ export async function POST(request: Request) {
     );
   }
 
+  // A mesa do mesário muda em dois momentos: o eleitor começou (LIBERADO →
+  // VOTANDO) e terminou (urna livre). O aviso não leva conteúdo de voto — só
+  // "seu estado mudou" — e uma falha aqui é coberta pelo polling.
+  const positionsCompleted = result.positions_completed ?? 0;
+  if (result.recorded && (positionsCompleted === 1 || result.finished)) {
+    await notifyPollWorkers(terminal.electionId, terminal.sectionId);
+  }
+
   return NextResponse.json({
     recorded: result.recorded ?? false,
     reason: result.reason ?? null,
     voteType: result.vote_type ?? voteType,
-    positionsCompleted: result.positions_completed ?? 0,
+    positionsCompleted,
     finished: result.finished ?? false,
   });
 }

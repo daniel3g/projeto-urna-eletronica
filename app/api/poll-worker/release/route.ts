@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { resolveTerminal } from "@/lib/auth/terminal";
-import { notifyTerminal } from "@/lib/realtime/broadcast";
+import { notifyPollWorkers, notifyTerminal } from "@/lib/realtime/broadcast";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /** Tempo que o eleitor tem para chegar à urna antes da liberação expirar. */
@@ -126,7 +126,11 @@ export async function POST(request: Request) {
 
   // 5. Avisa a urna. Se o broadcast falhar, a liberação continua valendo — a
   //    urna descobre pelo polling em até 3 s (doc 04 §5).
-  const notified = await notifyTerminal(ballotBoxId);
+  //    As outras mesas da seção também veem a urna ocupada na hora.
+  const [notified] = await Promise.all([
+    notifyTerminal(ballotBoxId),
+    notifyPollWorkers(terminal.electionId, terminal.sectionId),
+  ]);
 
   return NextResponse.json({
     released_at: now.toISOString(),

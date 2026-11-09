@@ -6,6 +6,15 @@ import { getRealtimeClient } from "@/lib/supabase/realtime-client";
 
 export type TerminalKind = "ballot_box" | "poll_worker";
 
+export type Desk = {
+  ballotBoxes: { id: string; label: string; busy: boolean }[];
+  sessions: {
+    ballotBox: { id: string; label: string };
+    status: "released" | "voting";
+    student: { id: string; rm: string; fullName: string };
+  }[];
+};
+
 export type TerminalState = {
   screen: string;
   terminal: { id: string; kind: TerminalKind; label: string };
@@ -13,6 +22,8 @@ export type TerminalState = {
   section: { id: string; code: string; name: string } | null;
   /** Só vem para o terminal do mesário. */
   stats: { total: number; voted: number; pending: number } | null;
+  /** Só vem para o terminal do mesário: urnas da seção e quem está em cada uma. */
+  desk: Desk | null;
   /** Só vem para a urna, e só quando há eleitor liberado. */
   session: { positionsCompleted: number } | null;
   ballot: {

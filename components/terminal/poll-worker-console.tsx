@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { Desk } from "@/components/terminal/use-terminal";
+
 type BallotBox = { id: string; label: string; busy: boolean };
 
 type VoterCard = {
@@ -36,10 +38,12 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function PollWorkerConsole({
   token,
+  desk,
   onChanged,
 }: {
   token: string;
-  onChanged: () => void;
+  desk: Desk | null;
+  onChanged: () => Promise<void> | void;
 }) {
   const [term, setTerm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,16 +51,25 @@ export function PollWorkerConsole({
   const [ballotBoxes, setBallotBoxes] = useState<BallotBox[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const sessions = desk?.sessions ?? [];
+  // Com todas as urnas da seção ocupadas não há para onde mandar o próximo
+  // eleitor: a busca some até alguma urna terminar.
+  const allBusy =
+    !!desk && desk.ballotBoxes.length > 0 && desk.ballotBoxes.every((box) => box.busy);
 
   const focusInput = useCallback(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
   }, []);
 
-  useEffect(() => focusInput(), [focusInput]);
+  // O campo volta (e ganha foco) quando uma urna fica livre — o mesário digita
+  // o próximo RM sem tocar no mouse.
+  useEffect(() => {
+    if (!allBusy) focusInput();
+  }, [allBusy, focusInput]);
 
   const authHeaders = useCallback(
     () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }),
@@ -69,7 +82,6 @@ export function PollWorkerConsole({
 
     setLoading(true);
     setError(null);
-    setConfirmation(null);
 
     try {
       // RM primeiro — é o caminho de todo dia. Só cai para busca por nome
@@ -138,13 +150,12 @@ export function PollWorkerConsole({
         return;
       }
 
-      setConfirmation(`Encaminhe para a ${body.ballot_box_label}`);
       setCards(null);
       setTerm("");
-      onChanged();
+      // Espera a mesa atualizada: assim o painel "liberado na Urna 01" já está
+      // na tela quando o botão destrava, sem piscar o campo de busca no meio.
+      await onChanged();
       focusInput();
-
-      window.setTimeout(() => setConfirmation(null), 4000);
     } catch {
       setError("Sem conexão com o servidor.");
     } finally {
@@ -152,7 +163,7 @@ export function PollWorkerConsole({
     }
   }
 
-  async function cancel(card: VoterCard) {
+  async function cancel(studentId: string) {
     setLoading(true);
     setError(null);
 
@@ -160,14 +171,14 @@ export function PollWorkerConsole({
       const response = await fetch("/api/poll-worker/cancel", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ student_id: card.student.id }),
+        body: JSON.stringify({ student_id: studentId }),
       });
 
       const body = await response.json();
       if (!response.ok) setError(body?.error?.message ?? "Falha ao cancelar.");
 
-      onChanged();
-      await lookup(term);
+      await onChanged();
+      if (cards) await lookup(term);
     } catch {
       setError("Sem conexão com o servidor.");
     } finally {
@@ -177,6 +188,52 @@ export function PollWorkerConsole({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5 p-6">
+      {sessions.map((session) => (
+        <section
+          key={session.ballotBox.id}
+          aria-live="polite"
+          className={`flex flex-wrap items-center gap-4 rounded-lg px-5 py-4 ${
+            session.status === "voting"
+              ? "bg-blue-500/15 text-blue-800 dark:text-blue-300"
+              : "bg-amber-500/15 text-amber-800 dark:text-amber-300"
+          }`}
+        >
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-widest opacity-80">
+              {session.ballotBox.label}
+            </p>
+            <p className="text-xl font-semibold">
+              {session.status === "voting"
+                ? "Eleitor votando"
+                : `Encaminhe para a ${session.ballotBox.label}`}
+            </p>
+            <p className="text-sm opacity-80">
+              {session.student.fullName} · RM {session.student.rm}
+            </p>
+          </div>
+
+          {/* Depois do primeiro voto o eleitor está diante da urna: cancelar
+              passa a ser ação do administrador (doc 05 §6). */}
+          {session.status === "released" ? (
+            <button
+              type="button"
+              onClick={() => void cancel(session.student.id)}
+              disabled={loading}
+              className="rounded-md border border-current/30 px-3 py-2 text-sm hover:bg-black/5 disabled:opacity-40 dark:hover:bg-white/10"
+            >
+              Cancelar liberação
+            </button>
+          ) : null}
+        </section>
+      ))}
+
+      {allBusy ? (
+        <p className="text-center text-sm opacity-70">
+          {desk && desk.ballotBoxes.length === 1
+            ? "Aguarde o eleitor terminar de votar para liberar o próximo."
+            : "Todas as urnas estão ocupadas. Aguarde uma delas terminar."}
+        </p>
+      ) : (
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -210,12 +267,7 @@ export function PollWorkerConsole({
           Não sabe o RM? Digite parte do nome e busque.
         </p>
       </form>
-
-      {confirmation ? (
-        <p className="rounded-lg bg-green-500/15 px-4 py-4 text-center text-lg font-semibold text-green-700 dark:text-green-400">
-          {confirmation}
-        </p>
-      ) : null}
+      )}
 
       {error ? (
         <p
@@ -334,7 +386,7 @@ export function PollWorkerConsole({
               {card.voterStatus === "released" ? (
                 <button
                   type="button"
-                  onClick={() => void cancel(card)}
+                  onClick={() => void cancel(card.student.id)}
                   disabled={loading}
                   className="rounded-md border border-black/15 px-3 py-2 text-sm hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:hover:bg-white/10"
                 >

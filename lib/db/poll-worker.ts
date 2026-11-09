@@ -91,6 +91,69 @@ export async function listBallotBoxes(
   }));
 }
 
+export type ActiveSession = {
+  ballotBox: { id: string; label: string };
+  status: "released" | "voting";
+  student: { id: string; rm: string; fullName: string };
+};
+
+/**
+ * Quem está liberado ou votando nas urnas informadas — o painel fixo do mesário.
+ *
+ * Só serve ao terminal do mesário, que já vê nome e RM de quem atende. A urna
+ * nunca recebe isto (doc 03 §4).
+ */
+export async function listActiveSessions(
+  electionId: string,
+  ballotBoxes: BallotBoxOption[],
+): Promise<ActiveSession[]> {
+  const busy = ballotBoxes.filter((box) => box.busy);
+  if (busy.length === 0) return [];
+
+  const db = createServiceClient();
+
+  const { data: voters } = await db
+    .from("election_voters")
+    .select("student_id, status, ballot_box_terminal_id")
+    .eq("election_id", electionId)
+    .in("status", ["released", "voting"])
+    .in(
+      "ballot_box_terminal_id",
+      busy.map((box) => box.id),
+    );
+
+  const rows = voters ?? [];
+  if (rows.length === 0) return [];
+
+  const { data: students } = await db
+    .from("students")
+    .select("id, rm, full_name")
+    .in(
+      "id",
+      rows.map((row) => row.student_id),
+    );
+
+  const studentById = new Map((students ?? []).map((row) => [row.id, row]));
+  const boxById = new Map(ballotBoxes.map((box) => [box.id, box]));
+
+  return rows.flatMap((row) => {
+    const box = row.ballot_box_terminal_id
+      ? boxById.get(row.ballot_box_terminal_id)
+      : undefined;
+    const student = studentById.get(row.student_id);
+    if (!box || !student) return [];
+    if (row.status !== "released" && row.status !== "voting") return [];
+
+    return [
+      {
+        ballotBox: { id: box.id, label: box.label },
+        status: row.status,
+        student: { id: student.id, rm: student.rm, fullName: student.full_name },
+      },
+    ];
+  });
+}
+
 function describeBlock(
   status: VoterStatus | null,
   votedAt: string | null,

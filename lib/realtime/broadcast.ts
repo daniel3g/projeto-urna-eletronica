@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createServiceClient } from "@/lib/supabase/service";
+
 /**
  * Envia um evento de broadcast para o tópico de um terminal.
  *
@@ -42,4 +44,25 @@ export async function notifyTerminal(terminalId: string): Promise<boolean> {
     // nunca deve desfazer uma liberação porque o aviso não saiu.
     return false;
   }
+}
+
+/**
+ * Avisa todos os terminais de mesário de uma seção — a urna começou ou terminou
+ * de receber votos, ou outra mesa liberou/cancelou alguém.
+ */
+export async function notifyPollWorkers(
+  electionId: string,
+  sectionId: string,
+): Promise<void> {
+  const db = createServiceClient();
+
+  const { data: terminals } = await db
+    .from("terminals")
+    .select("id")
+    .eq("election_id", electionId)
+    .eq("section_id", sectionId)
+    .eq("kind", "poll_worker")
+    .eq("is_active", true);
+
+  await Promise.all((terminals ?? []).map((row) => notifyTerminal(row.id)));
 }

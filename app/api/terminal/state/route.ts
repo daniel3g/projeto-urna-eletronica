@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { resolveTerminal } from "@/lib/auth/terminal";
+import {
+  listActiveSessions,
+  listBallotBoxes,
+  sweepExpiredReleases,
+  type ActiveSession,
+  type BallotBoxOption,
+} from "@/lib/db/poll-worker";
 import { createServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -47,17 +54,33 @@ export async function GET(request: Request) {
   // A urna não recebe nada disso — ela não precisa saber quem falta votar.
   let stats: { total: number; voted: number; pending: number } | null = null;
 
+  // Mesa do mesário: as urnas da seção e quem está em cada uma. É o que mantém
+  // "eleitor votando" na tela até a urna terminar.
+  let desk: { ballotBoxes: BallotBoxOption[]; sessions: ActiveSession[] } | null =
+    null;
+
   if (terminal.kind === "poll_worker") {
-    const { data: voters } = await db
-      .from("election_voters")
-      .select("status")
-      .eq("election_id", terminal.electionId)
-      .eq("section_id", terminal.sectionId)
-      .limit(5000);
+    // Liberações vencidas soltam a urna antes de a mesa ser montada.
+    await sweepExpiredReleases(terminal.electionId);
+
+    const [{ data: voters }, ballotBoxes] = await Promise.all([
+      db
+        .from("election_voters")
+        .select("status")
+        .eq("election_id", terminal.electionId)
+        .eq("section_id", terminal.sectionId)
+        .limit(5000),
+      listBallotBoxes(terminal.electionId, terminal.sectionId),
+    ]);
 
     const list = voters ?? [];
     const voted = list.filter((voter) => voter.status === "voted").length;
     stats = { total: list.length, voted, pending: list.length - voted };
+
+    desk = {
+      ballotBoxes,
+      sessions: await listActiveSessions(terminal.electionId, ballotBoxes),
+    };
   }
 
   // Estado da urna: existe eleitor liberado nesta máquina?
@@ -107,6 +130,7 @@ export async function GET(request: Request) {
     election,
     section,
     stats,
+    desk,
     session,
     ballot,
     realtime: { topic: `terminal:${terminal.id}` },

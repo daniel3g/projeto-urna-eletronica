@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { resolveTerminal } from "@/lib/auth/terminal";
-import { notifyTerminal } from "@/lib/realtime/broadcast";
+import { notifyPollWorkers, notifyTerminal } from "@/lib/realtime/broadcast";
 import { createServiceClient } from "@/lib/supabase/service";
 
 function fail(status: number, code: string, message: string) {
@@ -69,7 +69,12 @@ export async function POST(request: Request) {
   if (error) return fail(500, "cancel_failed", error.message);
 
   // A urna precisa voltar para a tela de espera.
-  if (ballotBoxId) await notifyTerminal(ballotBoxId);
+  // A urna precisa voltar para a tela de espera, e as mesas da seção veem a
+  // urna livre.
+  await Promise.all([
+    ballotBoxId ? notifyTerminal(ballotBoxId) : Promise.resolve(false),
+    notifyPollWorkers(terminal.electionId, terminal.sectionId),
+  ]);
 
   return NextResponse.json({ cancelled: true });
 }
