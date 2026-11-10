@@ -6,6 +6,7 @@ import { loadResults } from "@/lib/db/results";
 import { formatDateTime } from "@/lib/format";
 import { createServiceClient } from "@/lib/supabase/service";
 
+import { LiveCount } from "./live-count";
 import { Projection } from "./projection";
 
 type Props = { params: Promise<{ id: string }> };
@@ -78,6 +79,7 @@ export default async function ResultsPage({ params }: Props) {
             Relatório (PDF)
           </Link>
           <Projection positions={results.positions} electionName={election.name} />
+          <LiveCount positions={results.positions} electionName={election.name} />
         </div>
       </div>
 
