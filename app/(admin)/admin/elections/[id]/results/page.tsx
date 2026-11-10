@@ -7,7 +7,6 @@ import { formatDateTime } from "@/lib/format";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { LiveCount } from "./live-count";
-import { Projection } from "./projection";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -78,7 +77,6 @@ export default async function ResultsPage({ params }: Props) {
           >
             Relatório (PDF)
           </Link>
-          <Projection positions={results.positions} electionName={election.name} />
           <LiveCount positions={results.positions} electionName={election.name} />
         </div>
       </div>
@@ -100,54 +98,28 @@ export default async function ResultsPage({ params }: Props) {
         </div>
       </section>
 
-      {results.positions.map((position) => {
-        const max = Math.max(1, ...position.candidates.map((c) => c.votes));
-
-        return (
-          <section key={position.id} className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">{position.name}</h2>
-
-            {position.candidates.length === 0 ? (
-              <p className="text-sm opacity-60">Nenhum candidato cadastrado.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {position.candidates.map((candidate, rank) => (
-                  <li key={candidate.id} className="flex items-center gap-3">
-                    <span className="w-12 shrink-0 font-mono text-sm opacity-60">
-                      {candidate.number}
-                    </span>
-                    <span className="w-48 shrink-0 truncate font-medium">
-                      {candidate.name}
-                    </span>
-                    <span className="h-5 flex-1 overflow-hidden rounded bg-black/5 dark:bg-white/10">
-                      <span
-                        className={`block h-full ${
-                          rank === 0 && candidate.votes > 0
-                            ? "bg-green-600"
-                            : "bg-black/25 dark:bg-white/30"
-                        }`}
-                        style={{ width: `${(candidate.votes / max) * 100}%` }}
-                      />
-                    </span>
-                    <span className="w-16 shrink-0 text-right font-semibold tabular-nums">
-                      {candidate.votes}
-                    </span>
-                    <span className="w-16 shrink-0 text-right text-sm opacity-60 tabular-nums">
-                      {candidate.pct.toFixed(1)}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-black/5 pt-2 text-sm opacity-70 dark:border-white/10">
-              <span>Brancos: {position.blankVotes}</span>
-              <span>Nulos: {position.nullVotes}</span>
-              <span>Total: {position.totalVotes}</span>
-            </div>
-          </section>
-        );
-      })}
+      {/* A contagem não aparece nesta tela de propósito: quem abre a página
+          diante da turma não pode estragar a apuração animada. O resultado
+          só aparece em "Assistir à apuração" e no relatório. */}
+      <section className="rounded-lg border border-dashed border-black/15 p-6 dark:border-white/20">
+        <h2 className="font-medium">Resultado</h2>
+        <p className="mt-1 text-sm opacity-70">
+          O resultado não é exibido aqui para não antecipar a apuração. Use{" "}
+          <strong>Assistir à apuração</strong> para apresentar à turma ou o{" "}
+          <strong>Relatório (PDF)</strong> para consultar os números.
+        </p>
+        <ul className="mt-4 flex flex-col gap-1 text-sm">
+          {results.positions.map((position) => (
+            <li key={position.id} className="flex justify-between gap-4">
+              <span className="font-medium">{position.name}</span>
+              <span className="opacity-60">
+                {position.candidates.length}{" "}
+                {position.candidates.length === 1 ? "candidato" : "candidatos"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {partial ? (
         <p className="rounded-md bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
